@@ -25,7 +25,6 @@ from config import DataGenConfig
 from generate_coefficients import generate_coefficient
 from generate_sources import generate_source
 from solve_poisson import solve_poisson
-from generate_sensors import sample_sensors
 from utils import (
     set_seed,
     save_dataset_npz,
@@ -39,9 +38,9 @@ def generate_single_sample(
     idx: int,
     config: DataGenConfig,
     base_seed: int
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Generate a single (a, f, u) sample with sensors.
+    Generate a single (a, f, u) sample.
     
     Args:
         idx: Sample index
@@ -49,7 +48,7 @@ def generate_single_sample(
         base_seed: Base seed (actual seed = base_seed + idx)
         
     Returns:
-        Tuple of (a, f, u, sensor_pos, sensor_val) arrays
+        Tuple of (a, f, u) arrays
     """
     seed = base_seed + idx
     
@@ -60,17 +59,12 @@ def generate_single_sample(
     # Solve PDE
     u = solve_poisson(a, f, config)
     
-    # Sample sensors
-    sensors = sample_sensors(u, config, seed=seed + 2000000)
-    
     # Convert to numpy
     a_np = a.numpy().astype(np.float32)
     f_np = f.numpy().astype(np.float32)
     u_np = u.numpy().astype(np.float32)
-    sensor_pos = sensors['positions'].numpy().astype(np.float32)
-    sensor_val = sensors['values_noisy'].numpy().astype(np.float32)
     
-    return a_np, f_np, u_np, sensor_pos, sensor_val
+    return a_np, f_np, u_np
 
 
 def generate_dataset_split(
@@ -79,7 +73,7 @@ def generate_dataset_split(
     base_seed: int,
     num_workers: int = 1,
     desc: str = "Generating"
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Generate a dataset split (train/val/test).
     
@@ -91,17 +85,14 @@ def generate_dataset_split(
         desc: Progress bar description
         
     Returns:
-        Tuple of stacked arrays (a, f, u, sensors_pos, sensors_val)
+        Tuple of stacked arrays (a, f, u)
     """
     if num_samples == 0:
         H = config.grid_size
-        S = config.num_sensors
         return (
             np.empty((0, H, H), dtype=np.float32),
             np.empty((0, H, H), dtype=np.float32),
             np.empty((0, H, H), dtype=np.float32),
-            np.empty((0, S, 2), dtype=np.float32),
-            np.empty((0, S), dtype=np.float32),
         )
     
     # Generate samples
@@ -126,10 +117,8 @@ def generate_dataset_split(
     a_all = np.stack([r[0] for r in results], axis=0)
     f_all = np.stack([r[1] for r in results], axis=0)
     u_all = np.stack([r[2] for r in results], axis=0)
-    sensors_pos_all = np.stack([r[3] for r in results], axis=0)
-    sensors_val_all = np.stack([r[4] for r in results], axis=0)
     
-    return a_all, f_all, u_all, sensors_pos_all, sensors_val_all
+    return a_all, f_all, u_all
 
 
 def generate_full_dataset(
@@ -184,7 +173,7 @@ def generate_full_dataset(
         
         start_time = time.time()
         
-        a, f, u, sensors_pos, sensors_val = generate_dataset_split(
+        a, f, u = generate_dataset_split(
             num_samples=n_samples,
             config=config,
             base_seed=base_seed,
@@ -197,7 +186,7 @@ def generate_full_dataset(
         
         # Save dataset
         filepath = output_path / f"{split_name}{ext}"
-        save_fn(str(filepath), a, f, u, sensors_pos, sensors_val)
+        save_fn(str(filepath), a, f, u)
         output_files[split_name] = str(filepath)
         print(f"Saved: {filepath}")
         
@@ -261,11 +250,7 @@ def main():
                         choices=['gaussian', 'fourier'],
                         help='Source term generation method')
     
-    # Sensors
-    parser.add_argument('--num_sensors', type=int, default=50,
-                        help='Number of sparse sensors per sample')
-    parser.add_argument('--sensor_noise', type=float, default=0.01,
-                        help='Relative noise level for sensors')
+
     
     # Output
     parser.add_argument('--output', type=str, default='../data/prototype',
@@ -296,8 +281,6 @@ def main():
             a_min=args.a_min,
             a_max=args.a_max,
             source_method=args.source_method,
-            num_sensors=args.num_sensors,
-            sensor_noise=args.sensor_noise,
             seed=args.seed,
         )
     
@@ -309,7 +292,6 @@ def main():
     print(f"Samples: train={args.train_samples}, val={args.val_samples}, test={args.test_samples}")
     print(f"Coefficient range: [{config.a_min}, {config.a_max}]")
     print(f"Source method: {config.source_method}")
-    print(f"Sensors: {config.num_sensors} per sample, noise={config.sensor_noise}")
     print(f"Output: {args.output} ({args.format})")
     print(f"Seed: {config.seed}")
     print(f"Workers: {args.num_workers}")

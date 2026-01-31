@@ -33,7 +33,6 @@ def plot_sample(
     a: Union[torch.Tensor, np.ndarray],
     f: Union[torch.Tensor, np.ndarray],
     u: Union[torch.Tensor, np.ndarray],
-    sensors: Optional[Dict] = None,
     save_path: Optional[str] = None,
     title: Optional[str] = None,
     show: bool = True
@@ -45,7 +44,6 @@ def plot_sample(
         a: Diffusion coefficient, shape (H, W)
         f: Source term, shape (H, W)
         u: Solution, shape (H, W)
-        sensors: Optional sensor data dict from sample_sensors()
         save_path: Optional path to save figure
         title: Optional figure title
         show: Whether to display the plot
@@ -86,15 +84,6 @@ def plot_sample(
     axes[2].set_xlabel('x')
     axes[2].set_ylabel('y')
     plt.colorbar(im2, ax=axes[2], fraction=0.046)
-    
-    # Overlay sensors if provided
-    if sensors is not None:
-        indices = sensors['indices']
-        if isinstance(indices, torch.Tensor):
-            indices = indices.numpy()
-        axes[2].scatter(indices[:, 1], indices[:, 0], c='red', s=10, alpha=0.7, 
-                       marker='x', label=f'{len(indices)} sensors')
-        axes[2].legend(loc='upper right')
     
     if title:
         fig.suptitle(title, fontsize=14)
@@ -340,17 +329,15 @@ if __name__ == "__main__":
         from generate_coefficients import generate_coefficient
         from generate_sources import generate_source
         from solve_poisson import solve_poisson
-        from generate_sensors import sample_sensors
         
         config = DataGenConfig(grid_size=64)
         
         a = generate_coefficient(config, seed=42)
         f = generate_source(config, seed=42)
         u = solve_poisson(a, f, config)
-        sensors = sample_sensors(u, config, seed=42)
         
         # Test single sample plot
-        plot_sample(a, f, u, sensors=sensors, save_path='/tmp/test_sample.png', show=False)
+        plot_sample(a, f, u, save_path='/tmp/test_sample.png', show=False)
         print("✓ Single sample plot saved")
         
         # Test grid plot

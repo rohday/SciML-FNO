@@ -35,10 +35,6 @@ class DataGenConfig:
         bump_amplitude_max: Maximum bump amplitude
         fourier_modes: Maximum Fourier mode index (if method="fourier")
         
-        # Sensor parameters
-        num_sensors: Number of sparse sensor locations per sample
-        sensor_noise: Relative noise std for sensor readings
-        
         # Generation parameters
         seed: Base random seed for reproducibility
         dtype: Data type for tensors ("float32" or "float64")
@@ -63,10 +59,6 @@ class DataGenConfig:
     bump_amplitude_max: float = 2.0
     fourier_modes: int = 5
     
-    # Sensor parameters
-    num_sensors: int = 50
-    sensor_noise: float = 0.01
-    
     # Generation parameters
     seed: int = 42
     dtype: Literal["float32", "float64"] = "float32"
@@ -80,8 +72,6 @@ class DataGenConfig:
         assert self.sigma_max >= self.sigma_min, "sigma_max must be >= sigma_min"
         assert self.num_bumps_min >= 1, "num_bumps_min must be at least 1"
         assert self.num_bumps_max >= self.num_bumps_min, "num_bumps_max must be >= num_bumps_min"
-        assert self.num_sensors >= 0, "num_sensors must be non-negative"
-        assert self.sensor_noise >= 0, "sensor_noise must be non-negative"
         assert self.source_method in ("gaussian", "fourier"), "Invalid source_method"
     
     @classmethod

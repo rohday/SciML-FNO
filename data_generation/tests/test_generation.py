@@ -18,7 +18,6 @@ from config import DataGenConfig
 from generate_coefficients import generate_coefficient, generate_coefficient_batch
 from generate_sources import generate_source, generate_gaussian_bumps, generate_fourier_source
 from solve_poisson import solve_poisson, verify_solver_accuracy
-from generate_sensors import sample_sensors, create_sensor_mask
 from utils import normalize_field, denormalize_field, save_dataset_npz, load_dataset_npz
 
 
@@ -176,66 +175,6 @@ class TestPoissonSolver:
         assert interior.min() >= 0
 
 
-class TestSensorSampling:
-    """Tests for sensor sampling."""
-    
-    def test_sensor_count(self, config, sample_data):
-        _, _, u = sample_data
-        sensors = sample_sensors(u, config, seed=42)
-        
-        assert sensors['positions'].shape[0] == config.num_sensors
-        assert sensors['values'].shape[0] == config.num_sensors
-    
-    def test_sensor_positions_range(self, config, sample_data):
-        _, _, u = sample_data
-        sensors = sample_sensors(u, config, seed=42)
-        
-        # Positions should be in [0, 1]
-        assert sensors['positions'].min() >= 0
-        assert sensors['positions'].max() <= 1
-    
-    def test_sensor_values_match_solution(self, config, sample_data):
-        """Test that sensor values match solution at those locations."""
-        _, _, u = sample_data
-        
-        # Use zero noise for this test
-        config_no_noise = DataGenConfig(
-            grid_size=config.grid_size,
-            num_sensors=config.num_sensors,
-            sensor_noise=0.0
-        )
-        sensors = sample_sensors(u, config_no_noise, seed=42)
-        
-        # Values should exactly match solution
-        indices = sensors['indices']
-        expected = u[indices[:, 0], indices[:, 1]]
-        
-        assert torch.allclose(sensors['values'], expected)
-    
-    def test_sensor_noise(self, config, sample_data):
-        """Test that noisy values differ from true values."""
-        _, _, u = sample_data
-        
-        config_noise = DataGenConfig(
-            grid_size=config.grid_size,
-            num_sensors=config.num_sensors,
-            sensor_noise=0.1  # 10% noise
-        )
-        sensors = sample_sensors(u, config_noise, seed=42)
-        
-        # Noisy values should differ from true values
-        assert not torch.allclose(sensors['values'], sensors['values_noisy'])
-    
-    def test_sensor_mask(self, config, sample_data):
-        _, _, u = sample_data
-        sensors = sample_sensors(u, config, seed=42)
-        
-        mask = create_sensor_mask(config.grid_size, config.grid_size, sensors['indices'])
-        
-        assert mask.sum() == config.num_sensors
-        assert mask.min() == 0
-        assert mask.max() == 1
-
 
 class TestUtils:
     """Tests for utility functions."""
@@ -287,14 +226,10 @@ class TestIntegration:
         # Solve PDE
         u = solve_poisson(a, f, config)
         
-        # Sample sensors
-        sensors = sample_sensors(u, config, seed=42)
-        
         # Verify shapes
         assert a.shape == (config.grid_size, config.grid_size)
         assert f.shape == (config.grid_size, config.grid_size)
         assert u.shape == (config.grid_size, config.grid_size)
-        assert sensors['values'].shape[0] == config.num_sensors
         
         # Verify boundary conditions
         assert torch.allclose(u[0, :], torch.zeros(config.grid_size), atol=1e-10)

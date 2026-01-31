@@ -24,3 +24,15 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Checkpoints and Models
+checkpoints/
+*.pth
+
+# Training History
+history.json
+
+# Plots
+*.png
+eval_result.png
+training_plot.png
