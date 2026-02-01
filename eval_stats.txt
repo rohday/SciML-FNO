@@ -1,0 +1,10 @@
+Average Relative L2 Error: 0.08589
+Accuracy: 91.41% (Approx)
+
+----------------------------------------
+FNO Model Performance Benchmark
+----------------------------------------
+Avg Latency:   0.8761 ms ± 0.0359
+Throughput:    1141.43 samples/s
+RAM Usage:     ~0.12 MB (Process growth)
+Peak VRAM:     24.07 MB
