@@ -92,7 +92,7 @@ def train(args):
         
         print(f"Loading data from {args.data_path}")
         # Load Data
-        train_loader, train_stats = load_data(args.data_path, batch_size=32)
+        train_loader, train_stats = load_data(args.data_path, batch_size=args.batch_size)
         test_loader = train_loader # TODO: Allow separate test file
         
         # Calculate normalizer from training data
@@ -117,7 +117,7 @@ def train(args):
     myloss = LpLoss(size_average=True)
     
     # Training Loop
-    best_test_l2 = 1.0
+    best_test_l2 = float('inf')
     history = {'train_loss': [], 'test_loss': [], 'epochs': []}
     
     # Early Stopping Variables
@@ -179,7 +179,7 @@ def train(args):
         
         if test_l2 < best_test_l2:
             best_test_l2 = test_l2
-            save_checkpoint(model, optimizer, ep, f"{args.output_dir}/best_model.pth")
+            save_checkpoint(model, optimizer, ep, f"{args.output_dir}/model.pth")
             
         # Update history
         history['train_loss'].append(train_l2)
@@ -222,6 +222,7 @@ def train(args):
             break
     
     if plotter:
+        plotter.save(f"{args.output_dir}/training_curve.png")
         plotter.close()
 
     # Save history
@@ -229,6 +230,54 @@ def train(args):
     with open(f"{args.output_dir}/history.json", 'w') as f:
         json.dump(history, f)
     print(f"Training history saved to {args.output_dir}/history.json")
+
+    # Save Metadata for standalone evaluation
+    metadata = {
+        "train_samples": len(train_loader.dataset) if hasattr(train_loader, 'dataset') else 16,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "learning_rate": args.learning_rate,
+        "modes": args.modes,
+        "width": args.width,
+        "depth": args.depth
+    }
+    with open(f"{args.output_dir}/training_metadata.json", 'w') as f:
+        json.dump(metadata, f, indent=4)
+    print(f"Training metadata saved to {args.output_dir}/training_metadata.json")
+
+    # --- Auto-Evaluation ---
+    print("\n" + "="*50)
+    print("Starting Auto-Evaluation...")
+    print("="*50)
+    
+    import subprocess
+    import sys
+    
+    # Construct command
+    eval_cmd = [
+        sys.executable, "model/evaluate.py",
+        "--data_path", args.data_path,
+        "--checkpoint", args.output_dir,
+        "--modes", str(args.modes),
+        "--width", str(args.width),
+        "--depth", str(args.depth),
+        "--plot",
+        "--output_plot", "eval_result.png",
+        "--output_stats", "eval_stats.txt",
+        "--train_samples", str(len(train_loader.dataset) if hasattr(train_loader, 'dataset') else 16),
+        "--train_epochs", str(args.epochs),
+        "--train_batch_size", str(args.batch_size),
+        "--train_lr", str(args.learning_rate)
+    ]
+    
+    print(f"Running command: {' '.join(eval_cmd)}")
+    try:
+        subprocess.run(eval_cmd, check=True)
+        print("Auto-evaluation completed successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Auto-evaluation failed with error code {e.returncode}")
+    except Exception as e:
+        print(f"Auto-evaluation failed: {e}")
 
     return history
 
@@ -241,6 +290,7 @@ if __name__ == "__main__":
     parser.add_argument("--modes", type=int, default=12)
     parser.add_argument("--width", type=int, default=32)
     parser.add_argument("--depth", type=int, default=4)
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
 
     parser.add_argument("--dry-run", action="store_true", help="Run with synthetic data for testing")
     parser.add_argument("--plot", action="store_true", help="Show live training dashboard")

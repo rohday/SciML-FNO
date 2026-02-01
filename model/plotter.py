@@ -12,6 +12,7 @@ class LivePlotter:
         plt.ion()  # Turn on interactive mode
         self.fig = plt.figure(figsize=(12, 6))
         self.fig.canvas.manager.set_window_title(title)
+        self.start_time = time.time()
         
         # Grid layout: Chart on left (2/3), Info on right (1/3)
         # Grid layout: Chart on left (2/3), Info on right (1/3), Buttons at bottom right
@@ -122,6 +123,10 @@ class LivePlotter:
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
         
+    def save(self, filename):
+        self.fig.savefig(filename)
+        print(f"Training plot saved to {filename}")
+
     def close(self):
         plt.ioff()
-        plt.show() # Keep window open at end
+        plt.close(self.fig)

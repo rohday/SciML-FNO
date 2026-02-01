@@ -15,6 +15,7 @@ env/
 
 # Generated data (optional - uncomment if you don't want to track data)
 data/
+t1/
 *.npz
 *.h5
 
@@ -27,6 +28,7 @@ Thumbs.db
 
 # Checkpoints and Models
 checkpoints/
+allmodels/
 *.pth
 
 # Training History
@@ -36,3 +38,4 @@ history.json
 *.png
 eval_result.png
 training_plot.png
+eval_stats.txt

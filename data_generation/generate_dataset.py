@@ -167,9 +167,7 @@ def generate_full_dataset(
         if n_samples == 0:
             continue
         
-        print(f"\n{'='*60}")
-        print(f"Generating {split_name} split: {n_samples} samples")
-        print(f"{'='*60}")
+        print(f"Generating {split_name} split...")
         
         start_time = time.time()
         
@@ -188,16 +186,10 @@ def generate_full_dataset(
         filepath = output_path / f"{split_name}{ext}"
         save_fn(str(filepath), a, f, u)
         output_files[split_name] = str(filepath)
-        print(f"Saved: {filepath}")
-        
+
         # Compute statistics
         stats = compute_statistics(a, f, u)
         all_stats[split_name] = stats
-        
-        # Print sample info
-        print(f"  a range: [{a.min():.4f}, {a.max():.4f}]")
-        print(f"  f range: [{f.min():.4f}, {f.max():.4f}]")
-        print(f"  u range: [{u.min():.4f}, {u.max():.4f}]")
     
     total_elapsed = time.time() - total_start
     total_samples = train_samples + val_samples + test_samples
@@ -217,10 +209,9 @@ def generate_full_dataset(
     )
     output_files['metadata'] = str(metadata_path)
     
-    print(f"\n{'='*60}")
-    print(f"COMPLETE: Generated {total_samples} samples in {total_elapsed:.1f}s")
-    print(f"Output directory: {output_dir}")
-    print(f"{'='*60}")
+    print(f"\n{'-'*60}")
+    print(f"Generation complete.")
+    print(f"{'-'*60}")
     
     return output_files
 

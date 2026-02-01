@@ -38,6 +38,33 @@ def evaluate(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
+    # 0. Load Metadata (if available) & Set Defaults
+    args.plot = True # Always plot by default as requested
+    
+    checkpoint_dir = Path(args.checkpoint)
+    if checkpoint_dir.is_file(): checkpoint_dir = checkpoint_dir.parent
+    metadata_path = checkpoint_dir / "training_metadata.json"
+    
+    if metadata_path.exists():
+        import json
+        print(f"Loading metadata from {metadata_path}")
+        with open(metadata_path, 'r') as f:
+            meta = json.load(f)
+            
+        # Update args if they match defaults (likely not set by user)
+        # We assume if the user passed a specific value that isn't the default 
+        # (e.g. they want to test a different resolution), we might respect it.
+        # But simpler: Trust metadata for model config.
+        args.modes = meta.get('modes', args.modes)
+        args.width = meta.get('width', args.width)
+        args.depth = meta.get('depth', args.depth)
+        
+        # Training info
+        if args.train_samples is None: args.train_samples = meta.get('train_samples')
+        if args.train_epochs is None: args.train_epochs = meta.get('epochs')
+        if args.train_batch_size is None: args.train_batch_size = meta.get('batch_size')
+        if args.train_lr is None: args.train_lr = meta.get('learning_rate')
+
     # 1. Configuration (Must match training)
     config = FNOConfig(
         modes_x=args.modes,
@@ -52,7 +79,7 @@ def evaluate(args):
     # 3. Load Checkpoint
     checkpoint_path = args.checkpoint
     if Path(checkpoint_path).is_dir():
-         checkpoint_path = f"{checkpoint_path}/best_model.pth"
+         checkpoint_path = f"{checkpoint_path}/model.pth"
     
     if not Path(checkpoint_path).exists():
         # Fallback for benchmarking without a trained model if just testing speed
@@ -108,7 +135,24 @@ def evaluate(args):
 
     log("\n" + "-"*40)
     log("FNO Model Performance Benchmark")
-    log("-"*40)
+    log("-" * 40)
+
+    # Log Model Configuration
+    log(f"Model Architecture:")
+    log(f"  Modes: {args.modes}")
+    log(f"  Width: {args.width}")
+    log(f"  Depth: {args.depth}")
+    log("-" * 40)
+
+    # Log Training Metadata (if provided)
+    if args.train_samples:
+        log(f"Training Samples: {args.train_samples}")
+    if args.train_epochs:
+        log(f"Training Epochs:  {args.train_epochs}")
+    if args.train_batch_size:
+        log(f"Training Batch:   {args.train_batch_size}")
+    if args.train_samples or args.train_epochs:
+        log("-" * 40)
     
     # Get one sample for latency testing
     a_bench, f_bench, _ = next(iter(bench_loader))
@@ -249,6 +293,12 @@ if __name__ == "__main__":
     parser.add_argument("--runs", type=int, default=100, help="Number of runs for latency benchmarking")
     parser.add_argument("--compare", action="store_true", help="Run classical solver for comparison")
     parser.add_argument("--output_stats", type=str, default="eval_stats.txt", help="File to save evaluation statistics")
+    
+    # Training Metadata (Optional)
+    parser.add_argument("--train_samples", type=int, default=None)
+    parser.add_argument("--train_epochs", type=int, default=None)
+    parser.add_argument("--train_batch_size", type=int, default=None)
+    parser.add_argument("--train_lr", type=float, default=None)
     
     args = parser.parse_args()
     evaluate(args)
