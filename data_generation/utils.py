@@ -1,27 +1,18 @@
-"""
-Utility functions for data generation.
-
-Provides I/O, normalization, and reproducibility helpers.
-"""
+"""Utility functions for data generation."""
 
 import torch
 import numpy as np
 import h5py
 import yaml
 from pathlib import Path
-from typing import Dict, Optional, Union, List, Tuple
+from typing import Dict, Optional, Union, Tuple
 from dataclasses import asdict
 
 from config import DataGenConfig
 
 
 def set_seed(seed: int) -> None:
-    """
-    Set random seeds for reproducibility.
-    
-    Args:
-        seed: Random seed value
-    """
+    """Set random seeds for reproducibility."""
     torch.manual_seed(seed)
     np.random.seed(seed)
     if torch.cuda.is_available():
@@ -29,31 +20,11 @@ def set_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
-def save_dataset_npz(
-    path: str,
-    a: Union[torch.Tensor, np.ndarray],
-    f: Union[torch.Tensor, np.ndarray],
-    u: Union[torch.Tensor, np.ndarray],
-    sensors_pos: Optional[Union[torch.Tensor, np.ndarray]] = None,
-    sensors_val: Optional[Union[torch.Tensor, np.ndarray]] = None
-) -> None:
-    """
-    Save dataset to NPZ format.
-    
-    Args:
-        path: Output file path
-        a: Diffusion coefficients, shape (N, H, W)
-        f: Source terms, shape (N, H, W)
-        u: Solutions, shape (N, H, W)
-        sensors_pos: Optional sensor positions, shape (N, S, 2)
-        sensors_val: Optional sensor values, shape (N, S)
-    """
-    # Convert to numpy
+def save_dataset_npz(path: str, a, f, u, sensors_pos=None, sensors_val=None) -> None:
+    """Save dataset to NPZ format."""
     def to_numpy(x):
-        if x is None:
-            return None
-        if isinstance(x, torch.Tensor):
-            return x.detach().cpu().numpy()
+        if x is None: return None
+        if isinstance(x, torch.Tensor): return x.detach().cpu().numpy()
         return x
     
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -73,42 +44,16 @@ def save_dataset_npz(
 
 
 def load_dataset_npz(path: str) -> Dict[str, np.ndarray]:
-    """
-    Load dataset from NPZ format.
-    
-    Args:
-        path: Input file path
-        
-    Returns:
-        Dictionary with arrays: 'a', 'f', 'u', and optionally 'sensors_pos', 'sensors_val'
-    """
+    """Load dataset from NPZ format."""
     data = np.load(path)
     return {key: data[key] for key in data.files}
 
 
-def save_dataset_h5(
-    path: str,
-    a: Union[torch.Tensor, np.ndarray],
-    f: Union[torch.Tensor, np.ndarray],
-    u: Union[torch.Tensor, np.ndarray],
-    sensors_pos: Optional[Union[torch.Tensor, np.ndarray]] = None,
-    sensors_val: Optional[Union[torch.Tensor, np.ndarray]] = None,
-    compression: str = "gzip"
-) -> None:
-    """
-    Save dataset to HDF5 format (better for large datasets).
-    
-    Args:
-        path: Output file path
-        a, f, u: Arrays as in save_dataset_npz
-        sensors_pos, sensors_val: Optional sensor data
-        compression: HDF5 compression algorithm
-    """
+def save_dataset_h5(path: str, a, f, u, sensors_pos=None, sensors_val=None, compression: str = "gzip") -> None:
+    """Save dataset to HDF5 format."""
     def to_numpy(x):
-        if x is None:
-            return None
-        if isinstance(x, torch.Tensor):
-            return x.detach().cpu().numpy()
+        if x is None: return None
+        if isinstance(x, torch.Tensor): return x.detach().cpu().numpy()
         return x
     
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -125,15 +70,7 @@ def save_dataset_h5(
 
 
 def load_dataset_h5(path: str) -> Dict[str, np.ndarray]:
-    """
-    Load dataset from HDF5 format.
-    
-    Args:
-        path: Input file path
-        
-    Returns:
-        Dictionary with arrays
-    """
+    """Load dataset from HDF5 format."""
     data = {}
     with h5py.File(path, 'r') as hf:
         for key in hf.keys():
@@ -141,21 +78,8 @@ def load_dataset_h5(path: str) -> Dict[str, np.ndarray]:
     return data
 
 
-def save_metadata(
-    path: str,
-    config: DataGenConfig,
-    stats: Optional[Dict] = None,
-    extra: Optional[Dict] = None
-) -> None:
-    """
-    Save generation metadata to YAML.
-    
-    Args:
-        path: Output file path
-        config: Generation configuration
-        stats: Optional dataset statistics
-        extra: Optional extra metadata
-    """
+def save_metadata(path: str, config: DataGenConfig, stats: Optional[Dict] = None, extra: Optional[Dict] = None) -> None:
+    """Save generation metadata to YAML."""
     metadata = {
         'config': asdict(config),
         'stats': stats or {},
@@ -167,20 +91,8 @@ def save_metadata(
         yaml.dump(metadata, f, default_flow_style=False, sort_keys=False)
 
 
-def compute_statistics(
-    a: np.ndarray,
-    f: np.ndarray,
-    u: np.ndarray
-) -> Dict[str, Dict[str, float]]:
-    """
-    Compute dataset statistics.
-    
-    Args:
-        a, f, u: Dataset arrays of shape (N, H, W)
-        
-    Returns:
-        Dictionary with statistics for each field
-    """
+def compute_statistics(a: np.ndarray, f: np.ndarray, u: np.ndarray) -> Dict[str, float]:
+    """Compute dataset statistics."""
     def field_stats(x, name):
         return {
             f'{name}_min': float(x.min()),
@@ -199,22 +111,8 @@ def compute_statistics(
     return stats
 
 
-def normalize_field(
-    x: torch.Tensor,
-    method: str = "minmax",
-    stats: Optional[Dict[str, float]] = None
-) -> Tuple[torch.Tensor, Dict[str, float]]:
-    """
-    Normalize a field.
-    
-    Args:
-        x: Input tensor
-        method: "minmax" (to [0,1]) or "standard" (zero mean, unit std)
-        stats: Precomputed stats (for applying same normalization)
-        
-    Returns:
-        Normalized tensor and normalization statistics
-    """
+def normalize_field(x: torch.Tensor, method: str = "minmax", stats: Optional[Dict[str, float]] = None) -> Tuple[torch.Tensor, Dict[str, float]]:
+    """Normalize field using minmax or standard method."""
     if method == "minmax":
         if stats is None:
             min_val = x.min()
@@ -223,7 +121,6 @@ def normalize_field(
         else:
             min_val = stats['min']
             max_val = stats['max']
-        
         x_norm = (x - min_val) / (max_val - min_val + 1e-8)
         
     elif method == "standard":
@@ -234,43 +131,25 @@ def normalize_field(
         else:
             mean = stats['mean']
             std = stats['std']
-        
         x_norm = (x - mean) / (std + 1e-8)
-    
     else:
-        raise ValueError(f"Unknown normalization method: {method}")
+        raise ValueError(f"Unknown method: {method}")
     
     return x_norm, stats
 
 
-def denormalize_field(
-    x_norm: torch.Tensor,
-    method: str,
-    stats: Dict[str, float]
-) -> torch.Tensor:
-    """
-    Reverse normalization.
-    
-    Args:
-        x_norm: Normalized tensor
-        method: "minmax" or "standard"
-        stats: Normalization statistics
-        
-    Returns:
-        Denormalized tensor
-    """
+def denormalize_field(x_norm: torch.Tensor, method: str, stats: Dict[str, float]) -> torch.Tensor:
+    """Reverse normalization."""
     if method == "minmax":
-        x = x_norm * (stats['max'] - stats['min']) + stats['min']
+        return x_norm * (stats['max'] - stats['min']) + stats['min']
     elif method == "standard":
-        x = x_norm * stats['std'] + stats['mean']
+        return x_norm * stats['std'] + stats['mean']
     else:
-        raise ValueError(f"Unknown normalization method: {method}")
-    
-    return x
+        raise ValueError(f"Unknown method: {method}")
 
 
 class ProgressTracker:
-    """Simple progress tracking for data generation."""
+    """Simple progress tracking."""
     
     def __init__(self, total: int, desc: str = "Generating"):
         self.total = total
@@ -283,41 +162,35 @@ class ProgressTracker:
         print(f"\r{self.desc}: {self.current}/{self.total} ({pct:.1f}%)", end="", flush=True)
         
     def close(self) -> None:
-        print()  # Newline at end
+        print()
 
 
 if __name__ == "__main__":
-    # Test utilities
     print("Testing utilities...")
     
-    # Test seed setting
     set_seed(42)
     
-    # Test save/load NPZ
     a = np.random.randn(10, 64, 64).astype(np.float32)
     f = np.random.randn(10, 64, 64).astype(np.float32)
     u = np.random.randn(10, 64, 64).astype(np.float32)
     
     save_dataset_npz("/tmp/test_dataset.npz", a, f, u)
     loaded = load_dataset_npz("/tmp/test_dataset.npz")
-    assert np.allclose(loaded['a'], a), "NPZ roundtrip failed"
-    print("✓ NPZ save/load working")
+    assert np.allclose(loaded['a'], a)
+    print("✓ NPZ OK")
     
-    # Test HDF5
     save_dataset_h5("/tmp/test_dataset.h5", a, f, u)
     loaded_h5 = load_dataset_h5("/tmp/test_dataset.h5")
-    assert np.allclose(loaded_h5['a'], a), "H5 roundtrip failed"
-    print("✓ HDF5 save/load working")
+    assert np.allclose(loaded_h5['a'], a)
+    print("✓ HDF5 OK")
     
-    # Test statistics
     stats = compute_statistics(a, f, u)
-    print(f"✓ Statistics computed: {len(stats)} fields")
+    print(f"✓ Stats: {len(stats)} fields")
     
-    # Test normalization
     x = torch.randn(5, 64, 64)
     x_norm, norm_stats = normalize_field(x, method="minmax")
     x_denorm = denormalize_field(x_norm, "minmax", norm_stats)
-    assert torch.allclose(x, x_denorm, atol=1e-6), "Normalization roundtrip failed"
-    print("✓ Normalization working")
+    assert torch.allclose(x, x_denorm, atol=1e-6)
+    print("✓ Normalization OK")
     
     print("\n✓ All utility tests passed")

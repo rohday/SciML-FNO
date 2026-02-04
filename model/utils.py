@@ -3,17 +3,11 @@ import numpy as np
 import os
 from torch.utils.data import DataLoader, TensorDataset
 
-# --- Normalization ---
 
-class GaussianNormalizer(object):
-    """
-    Normalizes data to zero mean and unit variance.
-    Essential for neural operator performance.
+class GaussianNormalizer:
+    """Zero mean, unit variance normalization."""
     
-    x = (x - mean) / std
-    """
     def __init__(self, x, eps=1e-5):
-        super(GaussianNormalizer, self).__init__()
         self.mean = torch.mean(x)
         self.std = torch.std(x)
         self.eps = eps
@@ -22,7 +16,7 @@ class GaussianNormalizer(object):
         return (x - self.mean) / (self.std + self.eps)
 
     def decode(self, x):
-        return (x * (self.std + self.eps)) + self.mean
+        return x * (self.std + self.eps) + self.mean
     
     def cuda(self):
         self.mean = self.mean.cuda()
@@ -32,28 +26,18 @@ class GaussianNormalizer(object):
         self.mean = self.mean.cpu()
         self.std = self.std.cpu()
 
-# --- Data Loading ---
 
 def load_data(data_path, batch_size=32, num_workers=4):
-    """
-    Load .npz dataset and return DataLoaders.
-    
-    Expected keys in .npz:
-    - 'a': Coefficients (N, H, W)
-    - 'f': Sources (N, H, W)
-    - 'u': Solutions (N, H, W)
-    """
+    """Load .npz dataset. Returns DataLoader and shapes."""
     if not os.path.exists(data_path):
-        raise FileNotFoundError(f"Data file not found: {data_path}")
+        raise FileNotFoundError(f"Data not found: {data_path}")
         
     data = np.load(data_path)
     
-    # Convert to torch tensors
     a = torch.from_numpy(data['a']).float()
     f = torch.from_numpy(data['f']).float()
     u = torch.from_numpy(data['u']).float()
     
-    # Add channel dim if missing
     if a.ndim == 3: a = a.unsqueeze(1)
     if f.ndim == 3: f = f.unsqueeze(1)
     if u.ndim == 3: u = u.unsqueeze(1)
@@ -69,7 +53,6 @@ def load_data(data_path, batch_size=32, num_workers=4):
     
     return loader, (a.shape, f.shape, u.shape)
 
-# --- Checkpointing ---
 
 def save_checkpoint(model, optimizer, epoch, path):
     torch.save({
@@ -77,6 +60,7 @@ def save_checkpoint(model, optimizer, epoch, path):
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
     }, path)
+
 
 def load_checkpoint(model, optimizer, path):
     checkpoint = torch.load(path)

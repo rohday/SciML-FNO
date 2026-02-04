@@ -8,9 +8,7 @@ import psutil
 import os
 import sys
 
-# Add root path for data_generation imports if needed
 root_path = Path(__file__).parent.parent
-# Put data_generation FIRST to avoid shadowing by model/config.py
 if str(root_path / 'data_generation') not in sys.path:
     sys.path.insert(0, str(root_path / 'data_generation'))
 if str(root_path) not in sys.path:
@@ -21,7 +19,6 @@ from model.fno2d import FNO2d
 from model.utils import load_data, GaussianNormalizer, load_checkpoint
 from model.train import LpLoss
 
-# Conditional import for classical solver to avoid breaking if dependencies missing
 try:
     from data_generation.solve_poisson import solve_poisson
     from data_generation.config import DataGenConfig
@@ -29,17 +26,17 @@ except ImportError:
     solve_poisson = None
     DataGenConfig = None
 
+
 def measure_memory():
-    """Get current RAM usage in MB."""
     process = psutil.Process(os.getpid())
     return process.memory_info().rss / 1024 / 1024
+
 
 def evaluate(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    # 0. Load Metadata (if available) & Set Defaults
-    args.plot = True # Always plot by default as requested
+    args.plot = True
     
     checkpoint_dir = Path(args.checkpoint)
     if checkpoint_dir.is_file(): checkpoint_dir = checkpoint_dir.parent
@@ -51,21 +48,15 @@ def evaluate(args):
         with open(metadata_path, 'r') as f:
             meta = json.load(f)
             
-        # Update args if they match defaults (likely not set by user)
-        # We assume if the user passed a specific value that isn't the default 
-        # (e.g. they want to test a different resolution), we might respect it.
-        # But simpler: Trust metadata for model config.
         args.modes = meta.get('modes', args.modes)
         args.width = meta.get('width', args.width)
         args.depth = meta.get('depth', args.depth)
         
-        # Training info
         if args.train_samples is None: args.train_samples = meta.get('train_samples')
         if args.train_epochs is None: args.train_epochs = meta.get('epochs')
         if args.train_batch_size is None: args.train_batch_size = meta.get('batch_size')
         if args.train_lr is None: args.train_lr = meta.get('learning_rate')
 
-    # 1. Configuration (Must match training)
     config = FNOConfig(
         modes_x=args.modes,
         modes_y=args.modes,
@@ -73,35 +64,28 @@ def evaluate(args):
         depth=args.depth
     )
     
-    # 2. Model
     model = FNO2d(config).to(device)
     
-    # 3. Load Checkpoint
     checkpoint_path = args.checkpoint
     if Path(checkpoint_path).is_dir():
          checkpoint_path = f"{checkpoint_path}/model.pth"
     
     if not Path(checkpoint_path).exists():
-        # Fallback for benchmarking without a trained model if just testing speed
-        print(f"Warning: Checkpoint not found at {checkpoint_path}. Benchmarking initialized model.")
+        print(f"Warning: Checkpoint not found at {checkpoint_path}")
     else:
         print(f"Loading checkpoint: {checkpoint_path}")
-        epoch = load_checkpoint(model, None, checkpoint_path) # Optimizer=None for inference
+        epoch = load_checkpoint(model, None, checkpoint_path)
         print(f"Model loaded from epoch {epoch}")
     
-    # 4. Data Loading
     print(f"Loading test data from {args.data_path}")
     test_loader, _ = load_data(args.data_path, batch_size=32)
-    # For benchmarking latency, we might need a single sample
     bench_loader, _ = load_data(args.data_path, batch_size=1)
     
-    # 5. Accuracy Evaluation Loop
     model.eval()
     myloss = LpLoss(size_average=True)
     total_l2 = 0.0
     num_batches = 0
     
-    # Store first batch for visualization
     vis_a, vis_f, vis_u, vis_pred = None, None, None, None
     
     with torch.no_grad():
@@ -115,14 +99,12 @@ def evaluate(args):
             num_batches += 1
             
             if i == 0:
-                # Capture up to 8 samples
                 n_vis = min(8, a.shape[0])
                 vis_a = a[:n_vis].cpu()
                 vis_f = f[:n_vis].cpu()
                 vis_u = u[:n_vis].cpu()
                 vis_pred = out[:n_vis].cpu()
 
-    # Buffer for stats to save to file
     stats_buffer = []
     def log(msg=""):
         print(msg)
@@ -137,14 +119,12 @@ def evaluate(args):
     log("FNO Model Performance Benchmark")
     log("-" * 40)
 
-    # Log Model Configuration
     log(f"Model Architecture:")
     log(f"  Modes: {args.modes}")
     log(f"  Width: {args.width}")
     log(f"  Depth: {args.depth}")
     log("-" * 40)
 
-    # Log Training Metadata (if provided)
     if args.train_samples:
         log(f"Training Samples: {args.train_samples}")
     if args.train_epochs:
@@ -154,7 +134,6 @@ def evaluate(args):
     if args.train_samples or args.train_epochs:
         log("-" * 40)
     
-    # Get one sample for latency testing
     a_bench, f_bench, _ = next(iter(bench_loader))
     a_bench, f_bench = a_bench.to(device), f_bench.to(device)
     
@@ -165,10 +144,8 @@ def evaluate(args):
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
                 
-    # Latency Measurement
     latencies = []
     
-    # Reset peak memory stats
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
     start_ram = measure_memory()
@@ -184,13 +161,13 @@ def evaluate(args):
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
             t1 = time.time()
-            latencies.append((t1 - t0) * 1000) # ms
+            latencies.append((t1 - t0) * 1000)
             
     fno_avg_latency = np.mean(latencies)
     fno_std_latency = np.std(latencies)
     fno_throughput = 1000 / fno_avg_latency
     
-    fno_ram = measure_memory() - start_ram # Approx diff
+    fno_ram = measure_memory() - start_ram
     fno_vram = 0
     if torch.cuda.is_available():
         fno_vram = torch.cuda.max_memory_allocated() / 1024 / 1024
@@ -201,23 +178,20 @@ def evaluate(args):
     if torch.cuda.is_available():
         log(f"Peak VRAM:     {fno_vram:.2f} MB")
 
-    # 7. Classical Solver Benchmark (Optional)
     if args.compare and solve_poisson is not None:
         log("\n" + "-"*40)
         log("Classical Solver (SciPy) Benchmark")
         log("-"*40)
         
-        # Prepare inputs (CPU)
         a_cpu = a_bench.cpu()
         f_cpu = f_bench.cpu()
         gen_config = DataGenConfig(grid_size=a_bench.shape[-1])
         
-        # Warmup
         for _ in range(2):
             _ = solve_poisson(a_cpu[0,0], f_cpu[0,0], gen_config)
             
         classical_latencies = []
-        classical_runs = max(1, args.runs // 5) # Run fewer times as it is slower
+        classical_runs = max(1, args.runs // 5)
         
         for i in range(classical_runs):
             t0 = time.time()
@@ -231,9 +205,8 @@ def evaluate(args):
         log(f"Avg Latency:   {cls_avg_latency:.4f} ms")
         log(f"Throughput:    {1000/cls_avg_latency:.2f} samples/s")
     elif args.compare and solve_poisson is None:
-        log("\nWarning: Could not import classical solver dependencies. Skipping comparison.")
+        log("\nWarning: Could not import classical solver. Skipping comparison.")
     
-    # Save stats to file
     if args.output_stats:
         try:
             with open(args.output_stats, 'w') as f:
@@ -242,7 +215,6 @@ def evaluate(args):
         except Exception as e:
             print(f"\nCould not save stats: {e}")
 
-    # 8. Visualization
     if args.plot and vis_a is not None:
         try:
             plot_prediction(vis_a, vis_f, vis_u, vis_pred, args.output_plot)
@@ -250,15 +222,14 @@ def evaluate(args):
         except Exception as e:
             print(f"Could not save plot: {e}")
 
+
 def plot_prediction(a, f, u, pred, filename):
     n_samples = a.shape[0]
     fig, axs = plt.subplots(n_samples, 4, figsize=(15, 3 * n_samples))
     
-    # Handle single sample case (1D array of axes)
     if n_samples == 1:
         axs = axs[None, :]
     
-    # Helper to plot
     def plot_field(ax, data, title):
         im = ax.imshow(data.squeeze(), cmap='jet')
         if title:
@@ -267,7 +238,6 @@ def plot_prediction(a, f, u, pred, filename):
         ax.axis('off')
 
     for i in range(n_samples):
-        # Only set titles for the first row
         titles = ["Coefficient a(x,y)", "Source f(x,y)", "True u(x,y)", "Pred u(x,y)"] if i == 0 else [None]*4
         
         plot_field(axs[i, 0], a[i], titles[0])
@@ -279,6 +249,7 @@ def plot_prediction(a, f, u, pred, filename):
     plt.savefig(filename)
     plt.close()
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", type=str, default="checkpoints")
@@ -286,15 +257,11 @@ if __name__ == "__main__":
     parser.add_argument("--modes", type=int, default=12)
     parser.add_argument("--width", type=int, default=32)
     parser.add_argument("--depth", type=int, default=4)
-    parser.add_argument("--plot", action='store_true', help="Save a visualization plot")
+    parser.add_argument("--plot", action='store_true')
     parser.add_argument("--output_plot", type=str, default="eval_result.png")
-    
-    # Benchmarking arguments
-    parser.add_argument("--runs", type=int, default=100, help="Number of runs for latency benchmarking")
-    parser.add_argument("--compare", action="store_true", help="Run classical solver for comparison")
-    parser.add_argument("--output_stats", type=str, default="eval_stats.txt", help="File to save evaluation statistics")
-    
-    # Training Metadata (Optional)
+    parser.add_argument("--runs", type=int, default=100)
+    parser.add_argument("--compare", action="store_true")
+    parser.add_argument("--output_stats", type=str, default="eval_stats.txt")
     parser.add_argument("--train_samples", type=int, default=None)
     parser.add_argument("--train_epochs", type=int, default=None)
     parser.add_argument("--train_batch_size", type=int, default=None)
