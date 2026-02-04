@@ -1,0 +1,19 @@
+Average Relative L2 Error: 0.06453
+Accuracy: 93.55% (Approx)
+
+----------------------------------------
+FNO Model Performance Benchmark
+----------------------------------------
+Model Architecture:
+  Modes: 12
+  Width: 32
+  Depth: 4
+----------------------------------------
+Training Samples: 5000
+Training Epochs:  200
+Training Batch:   50
+----------------------------------------
+Avg Latency:   0.8712 ms ± 0.0392
+Throughput:    1147.89 samples/s
+RAM Usage:     ~0.12 MB (Process growth)
+Peak VRAM:     24.07 MB
