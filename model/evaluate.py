@@ -66,6 +66,9 @@ def evaluate(args):
     
     model = FNO2d(config).to(device)
     
+    # Calculate total parameters
+    total_params = sum(p.numel() for p in model.parameters())
+    
     checkpoint_path = args.checkpoint
     if Path(checkpoint_path).is_dir():
          checkpoint_path = f"{checkpoint_path}/model.pth"
@@ -111,9 +114,12 @@ def evaluate(args):
         stats_buffer.append(str(msg))
 
     avg_l2 = total_l2 / num_batches if num_batches > 0 else 0
+    
+    log(f"Total Parameters: {total_params:,}")
+    log()
     log(f"Average Relative L2 Error: {avg_l2:.5f}")
     acc_approx = (1 - avg_l2) * 100
-    log(f"Accuracy: {acc_approx:.2f}% (Approx)")
+    log(f"Accuracy: ~{acc_approx:.2f}%")
 
     log("\n" + "-"*40)
     log("FNO Model Performance Benchmark")
