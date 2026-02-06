@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .config import FNOConfig
-from .layers import SpectralConv2d
+from .layers import SpectralConv2d, DepthwiseSpectralConv2d
 
 class FNO2d(nn.Module):
     """FNO for 2D Poisson: (a, f) -> u via Lift -> Fourier Layers -> Project"""
@@ -20,9 +20,16 @@ class FNO2d(nn.Module):
         self.bn_layers = nn.ModuleList()
         
         for _ in range(config.depth):
-            self.spectral_layers.append(
-                SpectralConv2d(config.width, config.width, config.modes_x, config.modes_y)
-            )
+            if config.depthwise_separable:
+                # Depthwise: per-channel frequency filtering, ~32x fewer params
+                self.spectral_layers.append(
+                    DepthwiseSpectralConv2d(config.width, config.modes_x, config.modes_y)
+                )
+            else:
+                # Full: cross-channel frequency mixing
+                self.spectral_layers.append(
+                    SpectralConv2d(config.width, config.width, config.modes_x, config.modes_y)
+                )
             self.w_layers.append(nn.Conv2d(config.width, config.width, 1))
             self.bn_layers.append(nn.Identity())
 
