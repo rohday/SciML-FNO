@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.venv/
+
+# Model checkpoints
+checkpoints/
+
+# Evaluation outputs
+eval_result.png
+eval_stats.txt
+
+# Data (generated locally)
+data/
+
+# Benchmark outputs
+benchmarks/val.npz
+benchmark_report.txt
