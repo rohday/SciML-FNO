@@ -80,7 +80,7 @@ def train(args):
              raise ValueError("data_path must be specified when not in dry-run mode.")
         
         print(f"Loading data from {args.data_path}")
-        train_loader, train_stats = load_data(args.data_path, batch_size=args.batch_size)
+        train_loader, train_stats = load_data(args.data_path, batch_size=args.batch_size, num_workers=args.num_workers)
         test_loader = train_loader
         
         all_u = train_loader.dataset.tensors[2]
@@ -115,6 +115,11 @@ def train(args):
             out = model(a, f)
             loss = myloss(out, u)
             loss.backward()
+            
+            # Gradient clipping for training stability
+            if args.grad_clip > 0:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.grad_clip)
+            
             optimizer.step()
             
             train_l2 += loss.item()
@@ -123,19 +128,24 @@ def train(args):
 
         scheduler.step()
         train_l2 /= len(train_loader)
+        
+        # Only evaluate every N epochs (or on last epoch) for speed
+        if ep % args.eval_every == 0 or ep == args.epochs - 1:
+            model.eval()
+            test_l2 = 0.0
+            with torch.no_grad():
+                for a, f, u in test_loader:
+                    a, f, u = a.to(device), f.to(device), u.to(device)
+                    out = model(a, f)
+                    test_l2 += myloss(out, u).item()
+                    if args.dry_run: break
+                    
+            test_l2 /= len(test_loader)
+            last_test_l2 = test_l2
+        else:
+            test_l2 = last_test_l2 if 'last_test_l2' in dir() else float('inf')
+        
         t2 = time.time()
-        
-        model.eval()
-        test_l2 = 0.0
-        with torch.no_grad():
-            for a, f, u in test_loader:
-                a, f, u = a.to(device), f.to(device), u.to(device)
-                out = model(a, f)
-                test_l2 += myloss(out, u).item()
-                if args.dry_run: break
-                
-        test_l2 /= len(test_loader)
-        
         print(f"Epoch {ep}: Train L2={train_l2:.5f}, Test L2={test_l2:.5f}, Time={t2-t1:.2f}s")
         
         if test_l2 < best_test_l2:
@@ -235,10 +245,13 @@ if __name__ == "__main__":
     parser.add_argument("--modes", type=int, default=16)
     parser.add_argument("--width", type=int, default=48)
     parser.add_argument("--depth", type=int, default=6)
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--batch_size", type=int, default=20)
     parser.add_argument("--dry-run", action="store_true", help="Run with synthetic data")
     parser.add_argument("--plot", action="store_true", help="Show live training dashboard")
     parser.add_argument("--patience", type=int, default=20, help="Early stopping patience")
+    parser.add_argument("--grad_clip", type=float, default=0.25, help="Gradient clipping max norm (0 to disable)")
+    parser.add_argument("--eval_every", type=int, default=10, help="Evaluate every N epochs (default 10)")
+    parser.add_argument("--num_workers", type=int, default=4, help="DataLoader workers (default 4)")
     
     args = parser.parse_args()
     train(args)
