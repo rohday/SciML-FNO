@@ -1,0 +1,9 @@
+{
+    "train_samples": 8000,
+    "epochs": 500,
+    "batch_size": 32,
+    "learning_rate": 0.0005,
+    "modes": 20,
+    "width": 64,
+    "depth": 4
+}
