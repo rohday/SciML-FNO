@@ -1,4 +1,4 @@
-# SciML-FNO
+# 2D Heterogenous Poisson ML solver using Fourier Neural Operators
 
 Fourier Neural Operator for solving the 2D heterogeneous Poisson equation.
 
