@@ -22,7 +22,7 @@ python3 -m model.evaluate --checkpoint checkpoints/ --data_path data/test.npz
 ├── model/           # FNO implementation, training, evaluation
 ├── data_generation/ # Poisson solver and dataset generation
 ├── benchmarks/      # Throughput stress tests
-└── allmodels/       # Pre-trained models (z1k, z5k, z8k)
+└── allmodels/       # Pre-trained models
 ```
 
 ## Requirements
